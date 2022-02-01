@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="codemirror/lib/codemirror.css">
+	<link rel="stylesheet" type="text/css" href="codemirror/theme/dracula.css">
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<title></title>
+</head>
+<body>
+	<div>
+		<div class="task">
+			Необходимо написать SQL запрос, который позволит получить 5 записей из 6 возможных.
+		</div>
+		<div class="mainContainer">
+			<div class="workArea">
+				<textarea id="input_script"></textarea>
+				<div class="btnContainer">
+					<button id="run">Запустить</button>
+					<button id="submit">Проверить</button>		
+				</div>
+			</div>
+			<div class="tableListContainer">
+				<div class="tablesContainer">
+					<p class="tableListHeader underline">
+						<span>Список таблиц</span>
+						<span class="arrow">▲</span>
+					</p>
+					<div class="tableList"></div>
+				</div>
+				<div class="viewsContainer">
+					<p class="tableListHeader underline">
+						<span>Список представлений</span>
+						<span class="arrow">▲</span>
+					</p>
+					<div class="viewList"></div>
+				</div>
+			</div>
+		</div>
+		<div class="result"></div>
+	</div>
+	<script src="codemirror/lib/codemirror.js"></script>
+	<script type="text/javascript" src='codemirror/mode/sql/sql.js'></script>
+	<script src="codemirror/addon/comment/comment.js"></script>
+	<script src="codemirror/keymap/sublime.js"></script>
+	<script type="text/javascript" src="codemirror.js"></script>
+	<script type="text/javascript" src="database.js"></script>
+	<script type="text/javascript" src="sliders.js"></script>
+</body>
+</html>
