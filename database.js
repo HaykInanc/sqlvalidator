@@ -1,7 +1,7 @@
 let databaseName = 'database_1';
 
 let right_query = `
-	select name from users
+	select id, name from users
 	where length(name) < 6
 `;
 
@@ -33,7 +33,7 @@ let handlers={
 	    });
 	},
 	success_without_rows: function(){
-		let resultElem = document.querySelector('.result');
+		let resultElem = document.querySelector('.info');
 		let pElem = document.createElement('p');
 		pElem.innerText = 'Пустая выборка';
 		resultElem.appendChild(pElem);
@@ -47,33 +47,16 @@ let handlers={
 			return
 		}
 		let resultRows = result.rows;
+		const columns = Object.values(resultRows).map(t=>Object.values(t));
+		const header = Object.keys(resultRows[0]);
+
 		let resultElem = document.querySelector('.result');
-		let table = document.createElement('table');
-		table.setAttribute('border', '1');
-		let thRowElem = document.createElement('tr');
-		Object.keys(resultRows[0]).forEach(value => {
-			let columnElem = document.createElement('th');
-			columnElem.innerText = value;
-			thRowElem.appendChild(columnElem);
-		})
-
-		table.appendChild(thRowElem);
-
-		[...resultRows].forEach(row => {
-			let rowElem = document.createElement('tr');
-			table.appendChild(rowElem);
-			Object.values(row).forEach(value => {
-				let columnElem = document.createElement('td');
-				columnElem.innerText = (value === null)? 'NULL' : value;
-				rowElem.appendChild(columnElem);
-			})
-		})
-		resultElem.appendChild(table);
+		resultElem.appendChild(getTable(columns, header));
 	},
 	error: function(tx, error){
-		let resultElem = document.querySelector('.result');
+		let resultElem = document.querySelector('.info');
 		let errorElem = document.createElement('p');
-		errorElem.innerText = error.message;
+		errorElem.innerHTML = error.message;
 		errorElem.classList.add('error');
 		resultElem.appendChild(errorElem);
 	},
@@ -101,6 +84,43 @@ let handlers={
 		viewListElem.appendChild(ulElem_v);
 	}
 }
+
+function getTable(rows, header=[], topHeader){
+
+	let table = document.createElement('table');
+	table.setAttribute('border', '1');
+	
+	if (topHeader){
+		colspan = header.length;
+		let thRowElem = document.createElement('tr');
+		let columnElem = document.createElement('th');
+		columnElem.setAttribute('colspan', colspan);
+		columnElem.innerText = topHeader;
+		table.appendChild(columnElem);
+	}
+
+	if (header.length != 0){
+		let thRowElem = document.createElement('tr');
+		header.forEach(value => {
+			let columnElem = document.createElement('th');
+			columnElem.innerText = value;
+			thRowElem.appendChild(columnElem);
+		})
+		table.appendChild(thRowElem);
+	}
+	
+	rows.forEach(row => {
+		let rowElem = document.createElement('tr');
+		table.appendChild(rowElem);
+		row.forEach(value => {
+			let columnElem = document.createElement('td');
+			columnElem.innerText = (value === null)? 'NULL' : value;
+			rowElem.appendChild(columnElem);
+		})
+	})
+	return table 
+}
+
 
 function replaceAll(string, search, substr=' '){
 	return string.split(search).join(substr)
@@ -138,8 +158,8 @@ function loadStartDate(){
 
 
 function run(){
-	let resultElem = document.querySelector('.result');
-	resultElem.innerText = '';
+	document.querySelector('.result').innerText = '';
+	document.querySelector('.info').innerText = '';
 	db.transaction(function (tx) { 
 		getCode().forEach(script => tx.executeSql(script, [], (tx, result)=>handlers.success(tx, result, script), handlers.error))
 	}); 
@@ -147,20 +167,84 @@ function run(){
 }
 
 function submit(){
-
+	document.querySelector('.result').innerText = '';
+	document.querySelector('.info').innerText = '';
+	compareTables(editor.getValue(), right_query);
 }
 
 function compareTables(user_query, right_query){
+	const chekResults = {
+		queryWithData: undefined,
+		queryColumns: undefined,
+		rightColumns: undefined,
+		queryRows: undefined,
+		rightRows: undefined
+	}
+	db.transaction(async function (tx) { 
+		await tx.executeSql(user_query, [], (tx, result) => {
+			chekResults['queryWithData'] = Object.values(result.rows).length > 0;
+			
+			if (chekResults['queryWithData']){
+				chekResults['queryRows'] = Object.values(result.rows).map(row=>Object.values(row));
+				chekResults['queryColumns'] = Object.values(result.rows).map(row=>Object.keys(row))[0];
+			}else{
+				chekResults['queryRows'] = [];
+				chekResults['queryColumns'] = [];
+			}
+		}, ()=>{})
+		await tx.executeSql(right_query, [], (tx, result) => {
+				chekResults['rightRows'] = Object.values(result.rows).map(row=>Object.values(row));
+				chekResults['rightColumns'] = Object.values(result.rows).map(row=>Object.keys(row))[0];
+				const infoElement = document.querySelector('.info');
+				const resultElement = document.querySelector('.result');
+				if (!chekResults['queryWithData']){
+					infoElement.innerText = 'Ваш запрос возвращает пустую выборку';
+					// console.log('Ваш запрос возвращает пустую выборку');
+				}else if(JSON.stringify([...chekResults['queryColumns']].sort()) 
+					  != JSON.stringify([...chekResults['rightColumns']].sort())){
+					infoElement.innerHTML = `
+						<p>Ваш запос возвращает неверный набор полей</p>
+						<br>
+						<p>
+							<b>Ваш набор полей: </b>
+							<span>${chekResults['queryColumns'].join(' | ')}</span>
+						</p>
+						<p>
+							<b>Верный набор полей: </b>
+							<span>${chekResults['rightColumns'].join(' | ')}</span>
+						</p>
+						`;
+				}else if(JSON.stringify(chekResults['queryColumns']) 
+					 != JSON.stringify(chekResults['rightColumns'])){
+					infoElement.innerHTML = `
+						<p>Ваш запос возвращает верный набор полей, но не в том порядке</p>
+						<br>
+						<p>
+							<b>Ваш набор полей: </b>
+							<span>${chekResults['queryColumns'].join(' | ')}</span>
+						</p>
+						<p>
+							<b>Верный набор полей: </b>
+							<span>${chekResults['rightColumns'].join(' | ')}</span>
+						</p>
+						`;
+				}else if(JSON.stringify([...chekResults['queryRows']].sort()) 
+					  != JSON.stringify([...chekResults['rightRows']].sort())){
+					infoElement.innerText = 'Ваш запос возвращает неверный набор записей';
+					resultElement.append(getTable(chekResults['queryRows'], chekResults['queryColumns'], 'Ваша выборка'), 
+									  getTable(chekResults['rightRows'], chekResults['rightColumns'], 'Правильная выборка'))
 
-	/*
-		1) проверка на пустоту
-		2) проверка на набор полей
-		3) проверка на порядок полей
-		4) нехватающие записи
-		5) лишние записи
-	*/
-	tx.executeSql(user_query, [], ()=>{}, ()=>{})
-
+				
+				}else if(JSON.stringify(chekResults['queryRows']) 
+					 != JSON.stringify(chekResults['rightRows'])){
+					infoElement.innerText = 'Ваш запос возвращает верный набор записей, но не в том порядке.';
+					resultElement.append(getTable(chekResults['queryRows'], chekResults['queryColumns'], 'Ваша выборка'), 
+									  getTable(chekResults['rightRows'], chekResults['rightColumns'], 'Правильная выборка'))
+				}else{
+					infoElement.innerText = 'Все хорошо!';
+				}
+		}, ()=>{})
+	})
 	
 }
 
